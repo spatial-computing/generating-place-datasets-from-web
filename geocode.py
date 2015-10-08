@@ -37,7 +37,13 @@ def refine_address(address_file,dir_name,city):
     temp1=re.compile('\d+')
     of_name=dir_name+'/final_all_address.txt'
     outputfile=open(dir_name+'/final_all_address.txt','a')
+    check_file=open(dir_name+'/check_file_address.txt','r')
     check={}
+    lines=check_file.readlines()
+    for each_line in lines:
+        check[each_line]=1
+    check_file.close()
+    check_file=open(dir_name+'/check_file_address.txt','a')    
     road_names={'way': 1,'in': 1,'states': 1, 'av': 1, 'blvd': 1, 'ave': 1, 'st': 1, 'dr': 1, '2': 1, 'city': 1, 'lane': 1,'boulevard': 1,'center': 1,'avenue': 1,'valley': 1,'pkwy': 1,'place': 1,'parkway': 1,'main': 1,'pl': 1,'ste':1,'bl':1}
     geolocator = Nominatim()
     with open(address_file,'rb') as input_file:
@@ -59,7 +65,7 @@ def refine_address(address_file,dir_name,city):
                         continue                                       
                 print "count:",count1
                 #print "learned:",road_names
-                if count1>=830 and each_line.lower().find(city)>-1 and len(each_line.split(' '))>4:
+                if count1>=0 and each_line.lower().find(city)>-1 and len(each_line.split(' '))>4:
                     pos=each_line.lower().find(city)
                     if each_line[pos-1] !=' ' and each_line[pos-1] !=',':
                         each_line=each_line.replace(city,', '+city)                                                            
@@ -130,18 +136,23 @@ def refine_address(address_file,dir_name,city):
                                 print "still error that means not a address check it ",address
                                 continue
                     key= str(location.latitude)+str(location.longitude)           
-                    if key not in check:            
+                    if key not in check and str(location.address).lower().find('ca')>-1 and str(location.address).lower().find(city)>-1:            
                         check[key]=1
+                        check_file.write(key);
+                        check_file.write('\n');
                         print "Found data:",location.address+' *-* '+str(location.latitude)+' *-* '+str(location.longitude)+' *-* '+place_type
                         try:
                             outputfile.write(location.address+' *-* '+str(location.latitude)+' *-* '+str(location.longitude)+' *-* '+place_type)
                             write_count=write_count+1
                         except:
-                            continue    
+                            continue
+                    else:
+                        print "Repeated or Invalid Data: ",location.address            
     print "Total url processed:",url_count
     print "Total addresses found:",write_count                                             
     outputfile.close()  
-    input_file.close()                                                 
+    input_file.close()
+    check_file.close()                                                 
 
 if __name__ == '__main__':
     key=''

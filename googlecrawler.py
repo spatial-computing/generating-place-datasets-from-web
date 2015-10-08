@@ -16,20 +16,22 @@ import csv
 import urllib2, socket, time
 import gzip, StringIO
 import re, random, types
-from BeautifulSoup import BeautifulSoup
+from bs4 import BeautifulSoup
 from findF import listFile
 from findS import get_address_details
 from robobrowser.browser import RoboBrowser
 from robobrowser import exceptions
 from datetime import datetime
+from geocode import refine_address
 
 
 base_url = 'https://www.google.com.hk'
 results_per_page = 10
-expect_num = 80
+expect_num = 30
 key=""
-
 user_agents = list()
+
+    
 # results from the search engine
 # basically include url, title,content
 class SearchResult:
@@ -75,6 +77,19 @@ class SearchResult:
             file.close()
 
 
+
+def getName(each_site):    
+    pos=each_site.find('www.');
+    if pos==-1:
+        pos=each_site.find('.');
+        each_site=each_site[pos+len('.'):]
+    else:
+        each_site=each_site[pos+len('www.'):]
+    pos_end=each_site.find('.')
+    each_site=each_site[:pos_end]
+    return each_site
+    
+    
 class GoogleAPI:
     def __init__(self):
         timeout = 50
@@ -112,7 +127,7 @@ class GoogleAPI:
         return url 
 
     # extract serach results list from downloaded html file
-    def extractSearchResults(self, html, p, query):
+    def extractSearchResults(self, html, p, query,flag,invalid_site):
         number=0
         results = list()
         soup = BeautifulSoup(html)
@@ -139,9 +154,14 @@ class GoogleAPI:
                         print 'url:', url
                         address=urllib2.unquote(url)
                         print 'address:', address
-                        fileExtract = open('_URLS.txt', 'a')
-                        fileExtract.write(str(address)+'\n')
-                        fileExtract.close()
+                        if(flag):
+                            word=getName(address)
+                            print "checking for site:",word
+                            print "sites to check\n",invalid_site
+                            if word not in invalid_site:
+                                fileExtract = open('_URLS.txt', 'a')
+                                fileExtract.write(str(address)+'\n')
+                                fileExtract.close()
                         number=number+1
                     except Exception, e:
                         print 'error in download:', e
@@ -160,7 +180,7 @@ class GoogleAPI:
     # @param query -> query key words 
     # @param lang -> language of search results  
     # @param num -> number of search results to return 
-    def search(self, query, lang='en', num=results_per_page):
+    def search(self, query,invalid_site, flag,lang='en', num=results_per_page):
         search_results = list()
         squery=query
         query = urllib2.quote(query)
@@ -188,7 +208,7 @@ class GoogleAPI:
                     if(response.headers.get('content-encoding', None) == 'gzip'):
                         print('enter if')
                         html = gzip.GzipFile(fileobj=StringIO.StringIO(html)).read()
-                    results = self.extractSearchResults(html,p,query)
+                    results = self.extractSearchResults(html,p,query,flag,invalid_site)
                     search_results.extend(results)
                     break;
                 except urllib2.URLError,e:                   
@@ -214,26 +234,39 @@ def load_user_agent():
         user_agents.append(line)
         line = fp.readline()
     fp.close()
+    
+def findInvalidSites(final_site):
+    invalid_site=[]
+    for each_site in final_site:
+        each_site=getName(each_site.getURL())
+        invalid_site.append(str(each_site))
+    return invalid_site    
+    
 
-def crawler():
+def crawler(key):
+    invalid_site=[]
     # Load use agent string from file
     load_user_agent()
-
     # Create a GoogleAPI instance
-    api = GoogleAPI()
-
-    # set expect search results to be crawled
-    
-    # if no parameters, read query keywords from file
-    fileExtract = open('_URLS.txt', 'w')
+    api = GoogleAPI()    
+    #find_invalid_sites and filter them
+    query=key+", rent house"
+    results1 = api.search(query,invalid_site, 0,num = 3)
+    query1=key+", buy house"
+    results2 = api.search(query1,invalid_site,0, num = 3)
+    final_site=results1+results2;
+    invalid_site=findInvalidSites(final_site)    
+    print "Invalid site names:\n",invalid_site
     if(len(sys.argv) < 2):
         keywords = open('newkeywords', 'r')
         keyword = keywords.readline()
         key=keyword.split(',')[1].strip()        
         while(keyword):
-            print "Searching for:",keyword            
-            fileExtract.write("##"+str(keyword)+"\n")            
-            results = api.search(keyword, num = expect_num)
+            print "Searching for:",keyword
+            fileExtract = open('_URLS.txt', 'a')
+            fileExtract.write("##"+str(keyword)+"\n")
+            fileExtract.close()
+            results = api.search(keyword,invalid_site,1, num = expect_num)
             if len(results)==0:
                 print "url Error"
                 return
@@ -243,10 +276,10 @@ def crawler():
         keywords.close()
     else:
         keyword = sys.argv[1]
-        results = api.search(keyword, num = expect_num)
+        results = api.search(keyword,1, num = expect_num)
         for r in results:
            r.printIt()
-    fileExtract.close()       
+                                   
 
 if __name__ == '__main__':
     keywords = open('newkeywords', 'r')
@@ -255,15 +288,15 @@ if __name__ == '__main__':
     keywords.close()
     key=key.lower()
     print "Found Key:",key
-    """file1 = '_URLS.txt'
-    #if os.path.exists(file1):
-        #os.remove(file1)
-    #crawler()
+    file1 = '_URLS.txt'
+    if os.path.exists(file1):
+        os.remove(file1)    
+    crawler(key)
     dir_name="result_"+datetime.now().strftime('%H%M%S')	    
-    os.mkdir(dir_name)"""
-    dir_name="result_121019"
+    os.mkdir(dir_name)
+    #dir_name="result_230519"
     listFile('_URLS.txt',dir_name,key)
-    #refine_address('all_address.txt',dir_name,key)
-    #get_address_details(dir_name+'/final_all_address.txt')	
+    refine_address(dir_name+'/all_address.txt',dir_name,key)
+    get_address_details(dir_name+'/final_all_address.txt',dir_name)	
     
 

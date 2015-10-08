@@ -205,14 +205,14 @@ def listFile(url_file,dir_name,key):
     error_log=open(dir_name+"/error_log.txt",'a') 
     input_lines=input_file.readlines()
     count_url=0
-    count_addr=2993 
+    count_addr=0 
     for each_line in input_lines:
         output_file.write("\n") 
         output_file.write(each_line)        
         if(each_line[0]!="#" and len(each_line)>5):         
             count_url=count_url+1
             print "Working on url:",each_line
-            if count_url>=1574:                                               
+            if count_url>=0:                                               
                 count_addr=readAddress(each_line,output_file,error_log,count_addr,key)   
                 print "Address found: ",count_addr," URLS processed: ",count_url                
     output_file.close()
