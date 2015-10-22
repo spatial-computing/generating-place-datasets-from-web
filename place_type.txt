@@ -1,0 +1,15 @@
+#church
+#school
+#hospital
+#club
+#bank
+restaurant
+#bar
+gym
+#store
+#theater
+#hair salon
+#coffee shop
+#tutoring
+#realtor
+#hotel

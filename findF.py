@@ -1,11 +1,8 @@
 #-*- coding: utf-8 -*-
 import urllib2
-import urllib
 import re,random,time
 import os,sys 
 from bs4 import BeautifulSoup,Comment
-from pyquery import PyQuery as pq
-from lxml import etree
 from datetime import datetime
 
 
@@ -58,7 +55,7 @@ contains- key ex: culver city
 
 """    
 def processTags(tags,list1,key,data_flag):
-    temp1=re.compile('[0-9]{4}')
+    temp1=re.compile('[0-9]{3,4}')
     flag=0          
     for each_tag in tags:
         line_flag=0 #Extracting textual data from each tag
@@ -199,25 +196,45 @@ def readAddress(url,output_file,error_log,count_addr,key):
     return count_addr                                               
 
 #Function to read all found url's and process each one of it
-def listFile(url_file,dir_name,key): 
+def listFile(url_file,dir_name,key):
+    progress_file_name=dir_name+'/current_progress_2.txt'
+    if os.path.exists(progress_file_name):
+        progress_file=open(progress_file_name,'r')
+        lines=progree_file.readlines()        
+        if (lines[0].find('2-')>-1 and lines[0].find('complete')>-1):
+            return
+        else:
+            count=lines[0].split('-')[1]
+            count_addr=lines[0].split('-')[2]
+    else:
+        progress_file=open(progress_file_name,'w')
+        count=0
+        count_addr=0
+        progress_file.write('2-'+str(count)+'-'+str(count_addr)+'-')
+    progress_file.close()             
     input_file=open(url_file,'r') 
     output_file= open(dir_name+'/all_address.txt','a')
     error_log=open(dir_name+"/error_log.txt",'a') 
     input_lines=input_file.readlines()
-    count_url=0
-    count_addr=0 
+    count_url=0    
     for each_line in input_lines:
         output_file.write("\n") 
         output_file.write(each_line)        
         if(each_line[0]!="#" and len(each_line)>5):         
             count_url=count_url+1
             print "Working on url:",each_line
-            if count_url>=0:                                               
+            if count_url>=count:                                                            
                 count_addr=readAddress(each_line,output_file,error_log,count_addr,key)   
-                print "Address found: ",count_addr," URLS processed: ",count_url                
+                print "Address found: ",count_addr," URLS processed: ",count_url                                 
+                progress_file=open(progress_file_name,'w')
+                progress_file.write('2-'+str(count_url)+'-'+str(count_addr)+'-')
+                progress_file.close()                
     output_file.close()
     error_log.close()
     input_file.close()
+    progress_file=open(progress_file_name,'w')
+    progress_file.write('2-'+str(count_url)+'-'+str(count_addr)+'-complete')     
+    progress_file.close()
     
 if __name__ == '__main__':
     key=''

@@ -19,13 +19,11 @@ import re, random, types
 from bs4 import BeautifulSoup
 from findF import listFile
 from findS import get_address_details
-from robobrowser.browser import RoboBrowser
-from robobrowser import exceptions
 from datetime import datetime
 from geocode import refine_address
 
 
-base_url = 'https://www.google.com.hk'
+base_url = 'https://www.google.com'
 results_per_page = 10
 expect_num = 30
 key=""
@@ -127,7 +125,7 @@ class GoogleAPI:
         return url 
 
     # extract serach results list from downloaded html file
-    def extractSearchResults(self, html, p, query,flag,invalid_site):
+    def extractSearchResults(self, dir_name,html, p, query,flag,invalid_site):
         number=0
         results = list()
         soup = BeautifulSoup(html)
@@ -159,7 +157,7 @@ class GoogleAPI:
                             print "checking for site:",word
                             print "sites to check\n",invalid_site
                             if word not in invalid_site:
-                                fileExtract = open('_URLS.txt', 'a')
+                                fileExtract = open(dir_name+'/_URLS.txt', 'a')
                                 fileExtract.write(str(address)+'\n')
                                 fileExtract.close()
                         number=number+1
@@ -180,7 +178,7 @@ class GoogleAPI:
     # @param query -> query key words 
     # @param lang -> language of search results  
     # @param num -> number of search results to return 
-    def search(self, query,invalid_site, flag,lang='en', num=results_per_page):
+    def search(self, query,dir_name,invalid_site, flag,lang='en', num=results_per_page):
         search_results = list()
         squery=query
         query = urllib2.quote(query)
@@ -208,7 +206,7 @@ class GoogleAPI:
                     if(response.headers.get('content-encoding', None) == 'gzip'):
                         print('enter if')
                         html = gzip.GzipFile(fileobj=StringIO.StringIO(html)).read()
-                    results = self.extractSearchResults(html,p,query,flag,invalid_site)
+                    results = self.extractSearchResults(dir_name,html,p,query,flag,invalid_site)
                     search_results.extend(results)
                     break;
                 except urllib2.URLError,e:                   
@@ -239,11 +237,28 @@ def findInvalidSites(final_site):
     invalid_site=[]
     for each_site in final_site:
         each_site=getName(each_site.getURL())
-        invalid_site.append(str(each_site))
+        #checking if amongst invalid sites any imp site populated adjust if statements accordingly for any other site
+        if each_site.lower().find('yelp')<0:
+            invalid_site.append(str(each_site))
+    print "Invalid site found:",invalid_site
+    print "If any relevant site found as invalid then adjust if statements in googlecrawler.py:243"        
     return invalid_site    
     
 
-def crawler(key):
+def crawler(key,dir_name):
+    progress_file_name=dir_name+'/current_progress_1.txt'
+    if os.path.exists(progress_file_name):
+        progress_file=open(progress_file_name,'r')
+        lines=progress_file.readlines()        
+        if (lines[0].find('1-')>-1 and lines[0].find('complete')>-1):
+            return
+        else:
+            count=lines[0].split('-')[1]
+    else:
+        progress_file=open(progress_file_name,'w')
+        count=0
+        progress_file.write('1-'+str(count)+'-') 
+    progress_file.close()                   
     invalid_site=[]
     # Load use agent string from file
     load_user_agent()
@@ -251,52 +266,108 @@ def crawler(key):
     api = GoogleAPI()    
     #find_invalid_sites and filter them
     query=key+", rent house"
-    results1 = api.search(query,invalid_site, 0,num = 3)
+    results1 = api.search(query,dir_name,invalid_site, 0,num = 3)
     query1=key+", buy house"
-    results2 = api.search(query1,invalid_site,0, num = 3)
+    results2 = api.search(query1,dir_name,invalid_site,0, num = 3)
     final_site=results1+results2;
     invalid_site=findInvalidSites(final_site)    
     print "Invalid site names:\n",invalid_site
-    if(len(sys.argv) < 2):
-        keywords = open('newkeywords', 'r')
+    if(len(sys.argv) >= 2):
+        keywords = open(dir_name+'/keywords_new.txt', 'r')
         keyword = keywords.readline()
-        key=keyword.split(',')[1].strip()        
+        key=keyword.split(',')[1].strip()
+        current=0        
         while(keyword):
-            print "Searching for:",keyword
-            fileExtract = open('_URLS.txt', 'a')
-            fileExtract.write("##"+str(keyword)+"\n")
-            fileExtract.close()
-            results = api.search(keyword,invalid_site,1, num = expect_num)
-            if len(results)==0:
-                print "url Error"
-                return
-            for r in results:
-           	    r.printIt()
+            if current>=count:
+                print "Searching for:",keyword
+                fileExtract = open(dir_name+'/_URLS.txt', 'a')
+                fileExtract.write("\n"+"##"+str(keyword))
+                fileExtract.close()
+                results = api.search(keyword,dir_name,invalid_site,1, num = expect_num)
+                if len(results)==0:
+                    print "url Error"
+                    return
+                for r in results:
+               	    r.printIt()
+               	progress_file=open(progress_file_name,'w')    
+               	progress_file.write('1-'+str(current)+'-')      
+               	progress_file.close()
             keyword = keywords.readline()
+            current=current+1
         keywords.close()
+        progress_file=open(progress_file_name,'w')
+        progress_file.write('1-'+str(current)+'-complete')     
+        progress_file.close()
+
+def createKeywordsFile(file_name,dir_name):
+    input_file = open(file_name, 'r')
+    output_file=open(dir_name+'/keywords_new.txt','w')
+    place_file=open('place_type.txt','r')
+    place_types=[]    
+    for each_line in place_file.readlines():
+        if each_line.find('#')<0:
+            place_types.append(each_line.replace('\n',''))    
+    print "Working for place types:",place_types
+    lines=input_file.readlines()
+    city_name=lines[0][:-1]
+    for each_line in lines[1:]:
+        for each_place_type in place_types:
+            output_file.write(each_line[:-1]+', '+city_name+', '+each_place_type)
+            output_file.write("\n")
+    output_file.close()    
+    
+def cleanPrevious(status_file_name):
+    if os.path.exists(status_file_name):
+            status_file=open(status_file_name,'r')
+            for each_line in status_file.readlines():
+                dir_name=each_line
+            shutil.rmtree(dir_name)
+            status_file.close()
+            os.remove(status_file_name)    
     else:
-        keyword = sys.argv[1]
-        results = api.search(keyword,1, num = expect_num)
-        for r in results:
-           r.printIt()
-                                   
+        return
+
+def cleanPrevious2(status_file_name):
+    if os.path.exists(status_file_name):            
+            os.remove(status_file_name)    
+    else:
+        return                  
 
 if __name__ == '__main__':
-    keywords = open('newkeywords', 'r')
-    keyword = keywords.readline()
-    key=keyword.split(',')[1].strip()
-    keywords.close()
-    key=key.lower()
-    print "Found Key:",key
-    file1 = '_URLS.txt'
-    if os.path.exists(file1):
-        os.remove(file1)    
-    crawler(key)
-    dir_name="result_"+datetime.now().strftime('%H%M%S')	    
-    os.mkdir(dir_name)
-    #dir_name="result_230519"
-    listFile('_URLS.txt',dir_name,key)
-    refine_address(dir_name+'/all_address.txt',dir_name,key)
-    get_address_details(dir_name+'/final_all_address.txt',dir_name)	
-    
-
+    if len(sys.argv)<2:
+        print "Usage: googlecrawler.py <input file name> <-c optional clean flag>\nUse -c to start a clean start"
+        print "Input file format: <City name> and on every new line street names"
+    else:
+        status_file_name = 'status_file.txt'
+        if len(sys.argv)==3:
+            if sys.argv[2]=='-c':
+                print "Clean start"                
+                cleanPrevious(status_file_name)
+            if sys.argv[2]=='-n':
+                print "new start"                
+                cleanPrevious2(status_file_name)    
+        input_file=sys.argv[1]
+        #check status file        
+        if os.path.exists(status_file_name):
+            status_file=open('status_file.txt','r')
+            for each_line in status_file.readlines():
+                dir_name=each_line
+        else:                 
+            dir_name="result_"+datetime.now().strftime('%H%M%S')	    
+            os.mkdir(dir_name)
+            status_file=open('status_file.txt','w')
+            status_file.write(dir_name)
+        status_file.close()    
+        createKeywordsFile(input_file,dir_name)        
+        keywords = open(dir_name+'/keywords_new.txt', 'r')
+        keyword = keywords.readline()
+        key=keyword.split(',')[1].strip()
+        keywords.close()
+        key=key.lower()
+        print "Found Key:",key    
+        file1 = dir_name+'/_URLS.txt'          
+        crawler(key,dir_name)        
+        listFile(dir_name+'/_URLS.txt',dir_name,key)
+        refine_address(dir_name+'/all_address.txt',dir_name,key)
+        get_address_details(dir_name+'/final_all_address.txt',dir_name)
+        os.remove(status_file_name)   
