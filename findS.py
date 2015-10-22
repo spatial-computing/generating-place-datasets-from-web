@@ -122,11 +122,11 @@ def get_address_details(address_file,dir_name):
     progress_file_name=dir_name+'/current_progress_4.txt'
     if os.path.exists(progress_file_name):
         progress_file=open(progress_file_name,'r')
-        lines=progree_file.readlines()        
+        lines=progress_file.readlines()        
         if (lines[0].find('4-')>-1 and lines[0].find('complete')>-1):
             return
         else:
-            count=lines[0].split('-')[1]            
+            count=int(lines[0].split('-')[1])
     else:
         progress_file=open(progress_file_name,'w')
         count=1     

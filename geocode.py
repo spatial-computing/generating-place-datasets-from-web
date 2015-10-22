@@ -58,13 +58,13 @@ def refine_address(address_file,dir_name,city):
     progress_file_name=dir_name+'/current_progress_3.txt'
     if os.path.exists(progress_file_name):
         progress_file=open(progress_file_name,'r')
-        lines=progree_file.readlines()        
+        lines=progress_file.readlines()        
         if (lines[0].find('3-')>-1 and lines[0].find('complete')>-1):
             return
         else:
-            addr_count=lines[0].split('-')[1]
-            url_count=lines[0].split('-')[2]
-            write_count=lines[0].split('-')[3]
+            addr_count=int(lines[0].split('-')[1])
+            url_count=int(lines[0].split('-')[2])
+            write_count=int(lines[0].split('-')[3])
     else:
         progress_file=open(progress_file_name,'w')
         addr_count=0
